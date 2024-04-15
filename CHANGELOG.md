@@ -42,6 +42,22 @@ version development
   consist of multiple files.
   [PR 241](https://github.com/openwdl/wdl/pull/241) by @cjllanwarne.
 
+version 1.1.2
+---------------------------
+
++ State that `Union` is also the type of some `runtime` attributes.
+
++ Remove some syntax sections that were missed in 1.1.1.
+
++ Clarify short-circuiting of boolean expressions (#199)
+
++ Added requirement for tests to the RFC
+
++ Clarifies number of sections allowed within `task` and `workflow` blocks.
+  [PR 598](https://github.com/openwdl/wdl/pull/598) by @claymcleod
+
++ Clarified that `read_bool` is case-insensitive, and added an example.
+
 version 1.1.1
 ---------------------------
 

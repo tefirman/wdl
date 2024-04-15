@@ -1,11 +1,12 @@
 # Workflow Description Language (WDL)
 
-This is version 1.1.1 of the Workflow Description Language (WDL) specification. It describes WDL `version 1.1`. It introduces a number of new features (denoted by the ✨ symbol) and clarifications to the [1.0](https://github.com/openwdl/wdl/blob/main/versions/1.0/SPEC.md) version of the specification. It also deprecates several aspects of the 1.0 specification that will be removed in the [next major WDL version](https://github.com/openwdl/wdl/blob/wdl-2.0/SPEC.md) (denoted by the 🗑 symbol).
+This is version 1.1.2 of the Workflow Description Language (WDL) specification. It describes WDL `version 1.1`. It introduces a number of new features (denoted by the ✨ symbol) and clarifications to the [1.0](https://github.com/openwdl/wdl/blob/main/versions/1.0/SPEC.md) version of the specification. It also deprecates several aspects of the 1.0 specification that will be removed in the [next major WDL version](https://github.com/openwdl/wdl/blob/wdl-2.0/SPEC.md) (denoted by the 🗑 symbol).
 
 ## Revisions
 
 Revisions to this specification are made periodically in order to correct errors, clarify language, or add additional examples. Revisions are released as "patches" to the specification, i.e., the third number in the specification version is incremented. No functionality is added or removed after the initial revision of the specification is ratified.
 
+* [1.1.2](https://github.com/openwdl/wdl/tree/release-1.1.2/SPEC.md): 2024-04-12
 * [1.1.1](https://github.com/openwdl/wdl/tree/release-1.1.1/SPEC.md): 2023-10-04
 * [1.1.0](https://github.com/openwdl/wdl/tree/release-1.1.0/SPEC.md): 2021-01-29
  
@@ -113,8 +114,8 @@ Revisions to this specification are made periodically in order to correct errors
     - [Fully Qualified Names \& Namespaced Identifiers](#fully-qualified-names--namespaced-identifiers)
     - [Call Statement](#call-statement)
       - [Computing Call Inputs](#computing-call-inputs)
-    - [Scatter](#scatter)
-    - [Conditional (`if`)](#conditional-if)
+    - [Scatter Statement](#scatter-statement)
+    - [Conditional Statement](#conditional-statement)
 - [Standard Library](#standard-library)
   - [Numeric Functions](#numeric-functions)
     - [`floor`](#floor)
@@ -1227,10 +1228,11 @@ A hidden type is one that may only be instantiated by the execution engine, and 
 
 ##### Union
 
-The `Union` type is used for a value that may have any one of several concrete types. A `Union` value must always be coerced to a concrete type. The `Union` type is used in two contexts:
+The `Union` type is used for a value that may have any one of several concrete types. A `Union` value must always be coerced to a concrete type. The `Union` type is used in the following contexts:
 
 * It is the type of the special [`None`](#optional-types-and-none) value.
 * It is the return type of some standard library functions, such as [`read_json`](#read_json).
+* It is the type of some reserved [`runtime`](#runtime-section) attributes.
 
 #### Type Conversion
 
@@ -1797,6 +1799,11 @@ In operations on mismatched numeric types (e.g., `Int` + `Float`), the `Int` is 
 | 🗑 `File`    | `+`      | `File`    | `File`    | append file paths - error if second path is not relative |
 | 🗑 `File`    | `+`      | `String`  | `File`    | append file paths - error if second path is not relative |
 
+Boolean operator evaluation is minimal (or "short-circuiting"), meaning that:
+
+1. For `A && B`, if `A` evalutes to `false` then `B` is not evaluated
+2. For `A || B`, if `A` evaluates to `true` then `B` is not evaluated.
+
 WDL `String`s are compared by the unicode values of their corresponding characters. Character `a` is less than character `b` if it has a lower unicode value.
 
 Except for `String + File`, all concatenations between `String` and non-`String` types are deprecated and will be removed in WDL 2.0. The same effect can be achieved using [string interpolation](#expression-placeholders-and-string-interpolation).
@@ -2104,7 +2111,7 @@ Example output:
 
 #### Ternary operator (if-then-else)
 
-This operator takes three arguments: a condition expression, an if-true expression, and an if-false expression. The condition is always evaluated. If the condition is true then the if-true value is evaluated and returned. If the condition is false, the if-false expression is evaluated and returned. The if-true and if-false expressions must return values of the same type, such that the value of the if-then-else is the same regardless of which side is evaluated.
+This operator takes three arguments: a condition expression, an if-true expression, and an if-false expression. The condition is always evaluated. If the condition is `true` then the if-true value is evaluated and returned. If the condition is `false`, the if-false expression is evaluated and returned. The if-true and if-false expressions must return values of the same type, such that the value of the if-then-else is the same regardless of which side is evaluated.
 
 <details>
 <summary>
@@ -2997,13 +3004,19 @@ A WDL task can be thought of as a template for running a set of commands - speci
 
 A task is defined using the `task` keyword, followed by a task name that is unique within its WDL document.
 
-A task has a required [`command`](#command-section) that is a template for a Bash script.
+Tasks are comprised of the following elements:
 
-Tasks explicitly define their [`input`s](#task-inputs) and [`output`s](#task-outputs), which is essential for building dependencies between tasks and workflows. The value of an input declaration may be supplied by the caller. Tasks may have additional "private" declarations within the task body. All task declarations may be initialized with hard-coded literal values, or may have their values constructed from expressions. Input and private declarations can be referenced in the command template.
+* A single, optional [`input`](#task-inputs) section, which defines the inputs for the task.
+* A single, required [`command`](#command-section), which defines the Bash script to be executed.
+* A single, optional [`output`](#task-outputs) section, which defines the outputs for the task.
+* A single, optional [`requirements`](#✨-requirements-section) section, which defines the minimum, required runtime environment conditions.
+* A single, optional [`hints`](#✨-hints-section) section, which provides hints to the execution engine.
+* 🗑️ A single, optional [`runtime`](#-runtime-section) section, which defines the runtime environment conditions. This is mutually exclusive with the `requirements` and `hints` sections.
+* A single, optional [`meta`](#metadata-sections) section, which defines task-level metadata.
+* A single, optional [`parameter_meta`](#parameter-metadata-section) section, which defines parameter-level metadata.
+* Any number of [private declarations](#private-declarations).
 
-A task may also specify [requirements for the runtime environment](#runtime-section) (such as the amount of RAM or number of CPU cores) that must be satisfied in order for its commands to execute properly.
-
-There are two optional metadata sections: the [`meta`](#metadata-sections) section, for task-level metadata, and the [`parameter_meta`](#parameter-metadata-section) section, for parameter-level metadata.
+There is no enforced order for task elements.
 
 The execution engine is responsible for "instantiating" the shell script (i.e., replacing all references with actual values) in an environment that meets all specified runtime requirements, localizing any input files into that environment, executing the script, and generating any requested outputs.
 
@@ -5019,7 +5032,7 @@ Test config:
 
 ## Workflow Definition
 
-A workflow can be thought of as a directed acyclic graph (DAG) of transformations that convert the input data to the desired outputs. Rather than explicitly specifying the sequence of operations, A WDL workflow instead describes the connections between the steps in the workflow (i.e., between the nodes in the graph). It is the responsibility of the execution engine to determine the proper ordering of the workflow steps, and to orchestrate the execution of the different steps.
+A workflow can be thought of as a directed acyclic graph (DAG) of transformations that convert the input data to the desired outputs. Rather than explicitly specifying the sequence of operations, a WDL workflow instead describes the connections between the steps in the workflow (i.e., between the nodes in the graph). It is the responsibility of the execution engine to determine the proper ordering of the workflow steps, and to orchestrate the execution of the different steps.
 
 A workflow is defined using the `workflow` keyword, followed by a workflow name that is unique within its WDL document, followed by any number of workflow elements within braces.
 
@@ -5053,19 +5066,21 @@ workflow name {
 
 ### Workflow Elements
 
-Tasks and workflows have several elements in common. These sections have nearly the same usage in workflows as they do in tasks, so we just link to their earlier descriptions.
+Tasks and workflows have several elements in common. When applicable, the task definition for these sections is linked to rather than duplicated.
 
-* [`input` section](#task-inputs)
-* [Private declarations](#private-declarations)
-* [`output` section](#task-outputs)
-* [`meta` section](#metadata-sections)
-* [`parameter_meta` section](#parameter-metadata-section)
+A workflow is comprised of the following elements:
 
-In addition to these sections, a workflow may have any of the following elements that are specific to workflows:
+* A single, optional [`input`](#task-inputs) section (_identical to the `input` section within tasks_).
+* Any number of workflow execution elements, which include the following:
+* A [private declaration](#private-declarations) (_identical to private declarations within tasks_).
+  * A [`call`](#call-statement) statement, which invokes tasks or subworkflows.
+  * A [`scatter`](#scatter-statement) statement, which enables parallelized of workflow execution elements across collections.
+  * A [conditional (`if`)](#conditional-statement) statement, which enables conditional execution of workflow execution elements.
+* A single, optional [`output`](#task-outputs) section (_identical to the `output` section within tasks_).
+* A single, optional [`meta`](#metadata-sections) section (_identical to the `meta` section within tasks_).
+* A single, optional [`parameter_meta`](#parameter-metadata-section) section (_identical to the `parameter_meta` section within tasks_).
 
-* [`call`s](#call-statement) to tasks or subworkflows
-* [`scatters`](#scatter), which are used to parallelize operations across collections
-* [Conditional (`if`)](#conditional-if-block) statements, which are only executed when a conditional expression evaluates to `true`
+There is no enforced order for workflow elements.
 
 ### Workflow Inputs
 
@@ -5376,14 +5391,6 @@ The following fully-qualified names exist when calling `workflow main` in `main.
 \* Task inputs are accessible to be set by the caller of `main` if the workflow is called with [`allowNestedInputs: true`](#computing-call-inputs) in its `meta` section.
 
 ### Call Statement
-
-```
-$call = 'call' $ws* $namespaced_identifier $ws+ ('as' $identifier $ws+)? ('after $identifier $ws+)* $call_body?
-$call_body = '{' $ws* $inputs? $ws* '}'
-$inputs = 'input' $ws* ':' $ws* $variable_mappings
-$variable_mappings = $variable_mapping_kv (',' $variable_mapping_kv)*
-$variable_mapping_kv = $identifier $ws* ('=' $ws* $expression)?
-```
 
 A workflow calls other tasks/workflows via the `call` keyword. A `call` is followed by the name of the task or subworkflow to run. If a task is defined in the same WDL document as the calling workflow, it may be called using just the task name. A task or workflow in an imported WDL must be called using its [fully-qualified name](#fully-qualified-names--namespaced-identifiers).
 
@@ -5732,7 +5739,7 @@ Example output:
 </p>
 </details>
 
-### Scatter
+### Scatter Statement
 
 Scatter/gather is a common parallelization pattern in computer science. Given a collection of inputs (such as an array), the "scatter" step executes a set of operations on each input in parallel. In the "gather" step, the outputs of all the individual scatter-tasks are collected into the final output.
 
@@ -5932,7 +5939,7 @@ Example output:
 </p>
 </details>
 
-### Conditional (`if`)
+### Conditional Statement
 
 A conditional statement consists of the `if` keyword, followed by a `Boolean` expression and a body of (potentially nested) statements. The conditional body is only evaluated if the conditional expression evaluates to `true`.
 
@@ -6937,7 +6944,7 @@ Example output:
 Int read_int(File)
 ```
 
-Reads a file that contains a single line containing only an integer and (optional) whitespace. If the line contains a valid integer, that value is returned as an `Int`, otherwise an error is raised.
+Reads a file that contains a single line containing only an integer and (optional) whitespace. If the line contains a valid integer, that value is returned as an `Int`. If the file is empty or does not contain a single integer, an error is raised.
 
 **Parameters**
 
@@ -6986,7 +6993,7 @@ Example output:
 Float read_float(File)
 ```
 
-Reads a file that contains only a numeric value and (optional) whitespace. If the line contains a valid floating point number, that value is returned as a `Float`, otherwise an error is raised.
+Reads a file that contains only a numeric value and (optional) whitespace. If the line contains a valid floating point number, that value is returned as a `Float`. If the file is empty or does not contain a single float, an error is raised.
 
 **Parameters**
 
@@ -7038,7 +7045,7 @@ Example output:
 Boolean read_boolean(File)
 ```
 
-Reads a file that contains a single line containing only a boolean value and (optional) whitespace. If the line contains "true" or "false", that value is returned as a `Boolean`, otherwise an error is raised.
+Reads a file that contains a single line containing only a boolean value and (optional) whitespace. If the non-whitespace content of the line is "true" or "false", that value is returned as a `Boolean`. If the file is empty or does not contain a single boolean, an error is raised. The comparison is case- and whitespace-insensitive.
 
 **Parameters**
 
@@ -7093,6 +7100,8 @@ Array[String] read_lines(File)
 Reads each line of a file as a `String`, and returns all lines in the file as an `Array[String]`. Trailing end-of-line characters (`\r` and `\n`) are removed from each line.
 
 The order of the lines in the returned `Array[String]` is the order in which the lines appear in the file.
+
+If the file is empty, an empty array is returned.
 
 **Parameters**
 
@@ -7227,6 +7236,8 @@ Reads a tab-separated value (TSV) file as an `Array[Array[String]]` representing
 
 There is no requirement that the rows of the table are all the same length.
 
+If the file is empty, an empty array is returned.
+
 **Parameters**
 
 1. `File`: Path of the TSV file to read.
@@ -7355,6 +7366,8 @@ Map[String, String] read_map(File)
 Reads a tab-separated value (TSV) file representing a set of pairs. Each row must have exactly two columns, e.g., `col1\tcol2`. Trailing end-of-line characters (`\r` and `\n`) are removed from each line.
 
 Each pair is added to a `Map[String, String]` in order. The values in the first column must be unique; if there are any duplicate keys, an error is raised.
+
+If the file is empty, an empty map is returned.
 
 **Parameters**
 
@@ -7495,6 +7508,8 @@ The return value is of type [`Union`](#union) and must be used in a context wher
 If the JSON file contains an array, then all the elements of the array must be coercible to the same type, or an error is raised.
 
 The `read_json` function does not have access to any WDL type information, so it cannot return an instance of a specific `Struct` type. Instead, it returns a generic `Object` value that must be coerced to the desired `Struct` type.
+
+Note that an empty file is not valid according to the JSON specification, and so calling `read_json` on an empty file raises an error.
 
 **Parameters**
 
@@ -7687,7 +7702,7 @@ And `/local/fs/tmp/map.json` would contain:
 Object read_object(File)
 ```
 
-Reads a tab-separated value (TSV) file representing the names and values of the members of an `Object`. There must be two rows, and each row must have the same number of elements. Trailing end-of-line characters (`\r` and `\n`) are removed from each line.
+Reads a tab-separated value (TSV) file representing the names and values of the members of an `Object`. There must be exactly two rows, and each row must have the same number of elements, otherwise an error is raised. Trailing end-of-line characters (`\r` and `\n`) are removed from each line.
 
 The first row specifies the object member names. The names in the first row must be unique; if there are any duplicate names, an error is raised.
 
@@ -7767,9 +7782,11 @@ Array[Object] read_objects(File)
 
 Reads a tab-separated value (TSV) file representing the names and values of the members of any number of `Object`s. Trailing end-of-line characters (`\r` and `\n`) are removed from each line.
 
-There must be a header row with the names of the object members. The names in the first row must be unique; if there are any duplicate names, an error is raised.
+The first line of the file must be a header row with the names of the object members. The names in the first row must be unique; if there are any duplicate names, an error is raised.
 
 There are any number of additional rows, where each additional row contains the values of an object corresponding to the member names. Each row in the file must have the same number of fields as the header row. All of the `Object`'s values are of type `String`.
+
+If the file is empty or contains only a header line, an empty array is returned.
 
 **Parameters**
 
@@ -10421,7 +10438,7 @@ Where `/jobs/564757/sample_quality_scores.json` would contain:
 
 There are two alternative serialization formats for `Struct`s and `Objects:
 
-* JSON: `Struct`s and `Object`s are serialized identically using [`write_json`](#write_json). A JSON object is deserialized to a WDL `Object` using [`read_json](#read_json), which can then be coerced to a `Struct` type if necessary.
+* JSON: `Struct`s and `Object`s are serialized identically using [`write_json`](#write_json). A JSON object is deserialized to a WDL `Object` using [`read_json`](#read_json), which can then be coerced to a `Struct` type if necessary.
 * TSV: `Struct`s and `Object`s can be serialized to TSV format using [`write_object`](#write_object). The generated file has two lines tab-delimited: a header with the member names and the values, which must be coercible to `String`s. An array of `Struct`s or `Object`s can be written using [`write_objects`](#write_objects), in which case the generated file has one line of values for each struct/object. `Struct`s and `Object`s can be deserialized from the same TSV format using [`read_object`](#read_object)/[`read_objects`](#read_objects). Object member values are always of type `String` whereas struct member types must be coercible from `String`.
 
 # Appendix B: WDL Namespaces and Scopes
