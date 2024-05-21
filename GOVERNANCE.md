@@ -16,7 +16,7 @@ Current core team members are:
 | Christopher Llanwarne | Broad Institute | [cjllanwarne](https://github.com/cjllanwarne) |
 | John Didion | Fulcrum Genomics | [jdidion](https://github.com/jdidion) |
 | Michael Franklin | Centre for Population Genomics | [illusional](https://github.com/illusional) |
-| Amy Paguirigan | Fred Hutch | [vortexing](https://github.com/vortexing) |
+| Taylor Firman | Fred Hutch | [tefirman](https://github.com/tefirman) |
 | Ruben Vorderman | Leiden University Medical Center | [rhpvorderman](https://github.com/rhpvorderman) |
 | Venkat Malladi | Microsoft | [vsmalladi](https://github.com/vsmalladi) |
 
